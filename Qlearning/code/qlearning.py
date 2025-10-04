@@ -1,6 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+import time
+from matplotlib.colors import Normalize
+from matplotlib.cm import ScalarMappable
+
+# --- Matplotlib Interactive Mode ---
+# Enables the script to continue running while plots are open.
+plt.ion()
 
 class Gridworld:
     """
@@ -129,7 +136,7 @@ class QLearningAgent:
         if self.epsilon > self.min_epsilon:
             self.epsilon *= self.epsilon_decay
 
-def train_agent(episodes, params):
+def train_agent(episodes, params, animate=False, fig=None, ax=None):
     """Function to train the Q-learning agent and return rewards and Q-value history."""
     env = Gridworld(penalty=params.get('penalty', -1.0))
     agent = QLearningAgent(
@@ -143,20 +150,24 @@ def train_agent(episodes, params):
     total_rewards = []
     q_value_history = [] # To track a specific Q-value
     
-    # We will track the Q-value for moving 'Up' from the start state
     q_value_state = env.start_state
     q_value_action = 0 # 0 corresponds to 'Up'
     
+    # Generate more intervals for a detailed animation
+    animation_intervals = np.linspace(0, episodes - 1, num=12, dtype=int)
+
     for episode in range(episodes):
         pos = env.start_state
         episode_reward = 0
         steps = 0
         
-        while not env.is_terminal(pos) and steps < 200: # Max steps to prevent infinite loops
+        if animate and episode in animation_intervals:
+            animate_navigation(agent, episode, episodes, fig, ax)
+
+        while not env.is_terminal(pos) and steps < 200:
             action = agent.choose_action(pos)
             next_pos, reward = env.step(pos, action)
             agent.update_q_table(pos, action, reward, next_pos)
-            
             pos = next_pos
             episode_reward += reward
             steps += 1
@@ -167,40 +178,111 @@ def train_agent(episodes, params):
 
     return agent, total_rewards, q_value_history
 
-def plot_results(results, title, xlabel, parameter_name):
+def plot_results(results, title, xlabel, parameter_name, optimal_value):
     """Plot rewards over episodes for different parameter values."""
-    plt.figure(figsize=(12, 7))
-    plt.title(title, fontsize=16)
+    plt.figure(figsize=(12, 8))
+    plt.title(title, fontsize=16, pad=20)
     
     for param_val, data in results.items():
-        # Smooth the curve for better visualization
         smoothed_rewards = np.convolve(data['rewards'], np.ones(500)/500, mode='valid')
-        plt.plot(smoothed_rewards, label=f"{parameter_name} = {param_val}")
+        
+        # Highlight the optimal parameter's curve
+        is_optimal = (param_val == optimal_value)
+        linewidth = 3 if is_optimal else 1.5
+        alpha = 1.0 if is_optimal else 0.7
+        
+        plt.plot(smoothed_rewards, label=f"{parameter_name} = {param_val}", linewidth=linewidth, alpha=alpha)
         
     plt.xlabel(xlabel, fontsize=12)
     plt.ylabel("Total Reward per Episode (Smoothed)", fontsize=12)
     plt.legend()
     plt.grid(True)
+    plt.tight_layout()
     plt.show()
 
 def plot_q_value_convergence(q_history, title, window_size=500):
     """Plots the convergence of a single Q-value over episodes with a moving average."""
-    plt.figure(figsize=(12, 7))
-    plt.title(title, fontsize=16)
+    plt.figure(figsize=(12, 8))
+    plt.title(title, fontsize=16, pad=20)
     
-    # Calculate and plot the moving average
+    # Plot raw Q-values with transparency
+    plt.plot(q_history, color='lightblue', alpha=0.3, label='Raw Q-Value')
+    
+    # Plot smoothed Q-values
     smoothed_q_values = np.convolve(q_history, np.ones(window_size)/window_size, mode='valid')
-    plt.plot(smoothed_q_values)
+    plt.plot(smoothed_q_values, color='darkblue', linewidth=2, label='Smoothed Q-Value (Moving Avg)')
     
     plt.xlabel("Episodes", fontsize=12)
-    plt.ylabel("Q-Value (Smoothed)", fontsize=12)
+    plt.ylabel("Q-Value", fontsize=12)
+    plt.legend()
     plt.grid(True)
+    plt.tight_layout()
     plt.show()
+
+def animate_navigation(agent, episode, total_episodes, fig, ax):
+    """Animate the agent's learned policy and Q-values at a specific episode."""
+    ax.cla()
+    env = agent.env
+    
+    # --- Q-Value Heatmap ---
+    max_q_values = np.max(agent.q_table, axis=2)
+    # Handle case where all Q-values are zero to avoid vmin/vmax error
+    vmin = np.min(max_q_values) if np.any(max_q_values != 0) else -1
+    vmax = np.max(max_q_values) if np.any(max_q_values != 0) else 1
+    norm = Normalize(vmin=vmin - 0.1, vmax=vmax + 0.1)
+    cmap = plt.get_cmap('RdYlGn')
+    
+    ax.set_xticks(np.arange(-.5, env.width, 1), minor=True)
+    ax.set_yticks(np.arange(-.5, env.height, 1), minor=True)
+    ax.grid(which="minor", color="black", linestyle='-', linewidth=2)
+    ax.tick_params(which="minor", size=0)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    action_arrows = {0: '↑', 1: '↓', 2: '←', 3: '→'}
+
+    for r in range(env.height):
+        for c in range(env.width):
+            pos = (r, c)
+            
+            # Set background color based on max Q-value
+            ax.add_patch(plt.Rectangle((c - 0.5, r - 0.5), 1, 1, facecolor=cmap(norm(max_q_values[r, c]))))
+
+            if pos == env.obstacle_state:
+                ax.add_patch(plt.Rectangle((c - 0.5, r - 0.5), 1, 1, facecolor='black'))
+                ax.text(c, r, 'WALL', ha='center', va='center', color='white', fontsize=12, weight='bold')
+            elif pos in env.terminal_states:
+                reward = env.get_reward(pos)
+                facecolor = 'gold' if reward > 0 else 'maroon'
+                ax.add_patch(plt.Rectangle((c - 0.5, r - 0.5), 1, 1, facecolor=facecolor, alpha=0.7))
+                ax.text(c, r, f"[{int(reward)}]", ha='center', va='center', fontsize=14, weight='bold')
+            else:
+                if not np.all(agent.q_table[r, c] == 0):
+                    action = np.argmax(agent.q_table[r, c])
+                    ax.text(c, r, action_arrows[action], ha='center', va='center', fontsize=24, color='black', weight='bold')
+                
+                # Display individual Q-values
+                q_vals = agent.q_table[r, c]
+                ax.text(c, r + 0.4, f"{q_vals[0]:.2f}", ha='center', va='top', fontsize=8, color='black')
+                ax.text(c, r - 0.4, f"{q_vals[1]:.2f}", ha='center', va='bottom', fontsize=8, color='black')
+                ax.text(c - 0.45, r, f"{q_vals[2]:.2f}", ha='left', va='center', fontsize=8, color='black')
+                ax.text(c + 0.45, r, f"{q_vals[3]:.2f}", ha='right', va='center', fontsize=8, color='black')
+            
+            if pos == env.start_state:
+                ax.text(c, r, 'START', ha='center', va='center', color='black', fontsize=9, weight='bold', bbox=dict(boxstyle="round,pad=0.1", fc='yellow', ec='black', lw=1))
+
+    # Correct the visual orientation to match array indexing (0,0 at top-left)
+    ax.invert_yaxis()
+    ax.set_title(f"Episode {episode}/{total_episodes} | Press right arrow key to continue...", fontsize=14, pad=15)
+    
+    # Pause execution and wait for a key press to continue
+    plt.draw()
+    fig.waitforbuttonpress()
+
 
 def display_policy(agent):
     """Visualize the learned policy."""
     env = agent.env
-    # Use a standard list of lists for flexible string lengths and better alignment
     policy_grid = [[' ' for _ in range(env.width)] for _ in range(env.height)]
     
     action_arrows = {0: '↑', 1: '↓', 2: '←', 3: '→'}
@@ -212,10 +294,8 @@ def display_policy(agent):
                 policy_grid[r][c] = 'WALL'
             elif pos in env.terminal_states:
                 reward = env.get_reward(pos)
-                # Format to integer if it's a whole number, e.g., [1] or [-200]
                 policy_grid[r][c] = f"[{int(reward)}]"
             else:
-                # If all Q-values are zero (unexplored), show a dot.
                 if np.all(agent.q_table[r, c] == 0):
                     policy_grid[r][c] = '.'
                 else:
@@ -224,29 +304,30 @@ def display_policy(agent):
                 
     print("\nLearned Policy:")
     print("-" * 29)
-    # Print grid in natural top-to-bottom order for intuitive viewing
     for i in range(env.height):
-        # Use rjust to right-align each cell for a clean grid look
         print(' '.join([cell.rjust(5) for cell in policy_grid[i]]))
     print("-" * 29)
 
 
 if __name__ == '__main__':
     EPISODES = 20000
+    plt.style.use('seaborn-v0_8-whitegrid')
 
-    # --- 1. Optimal Run ---
-    print("--- Running with Optimal Parameters ---")
+    # --- 1. Optimal Run with Animation ---
+    print("--- Running with Optimal Parameters (with Animation) ---")
+    fig, ax = plt.subplots(figsize=(10, 7))
     optimal_params = {'alpha': 0.1, 'gamma': 0.99, 'epsilon_decay': 0.9999}
-    optimal_agent, optimal_rewards, q_history = train_agent(EPISODES, optimal_params)
+    optimal_agent, optimal_rewards, q_history = train_agent(
+        EPISODES, optimal_params, animate=True, fig=fig, ax=ax
+    )
+    print("\nAnimation complete. Final policy from animated run:")
     display_policy(optimal_agent)
-    
-    # Plot Q-value convergence for the optimal run
-    plot_q_value_convergence(q_history, "Q-Value Convergence for Start State -> 'Up' (Smoothed)")
+    plt.close(fig)
 
+    # Plot Q-value convergence for the optimal run
+    plot_q_value_convergence(q_history, "Q-Value Convergence for Start State -> 'Up'")
 
     # --- Hyperparameter Tuning Experiments ---
-
-    # a) Learning Rate (alpha)
     print("\n--- Testing different Learning Rates (alpha) ---")
     alpha_results = {}
     alphas = [0.01, 0.1, 0.5, 0.9]
@@ -256,9 +337,8 @@ if __name__ == '__main__':
         params['alpha'] = alpha
         agent, rewards, _ = train_agent(EPISODES, params)
         alpha_results[alpha] = {'agent': agent, 'rewards': rewards}
-    plot_results(alpha_results, "Effect of Learning Rate (α) on Performance", "Episodes", "α")
+    plot_results(alpha_results, "Effect of Learning Rate (α) on Performance", "Episodes", "α", optimal_params['alpha'])
 
-    # b) Discount Factor (gamma)
     print("\n--- Testing different Discount Factors (gamma) ---")
     gamma_results = {}
     gammas = [0.5, 0.9, 0.99, 1.0]
@@ -268,9 +348,8 @@ if __name__ == '__main__':
         params['gamma'] = gamma
         agent, rewards, _ = train_agent(EPISODES, params)
         gamma_results[gamma] = {'agent': agent, 'rewards': rewards}
-    plot_results(gamma_results, "Effect of Discount Factor (γ) on Performance", "Episodes", "γ")
+    plot_results(gamma_results, "Effect of Discount Factor (γ) on Performance", "Episodes", "γ", optimal_params['gamma'])
 
-    # c) Epsilon Decay
     print("\n--- Testing different Epsilon Decay Rates ---")
     epsilon_decay_results = {}
     decays = [0.999, 0.9999, 0.99999]
@@ -280,7 +359,7 @@ if __name__ == '__main__':
         params['epsilon_decay'] = decay
         agent, rewards, _ = train_agent(EPISODES, params)
         epsilon_decay_results[decay] = {'agent': agent, 'rewards': rewards}
-    plot_results(epsilon_decay_results, "Effect of Epsilon Decay on Performance", "Episodes", "ε-decay")
+    plot_results(epsilon_decay_results, "Effect of Epsilon Decay on Performance", "Episodes", "ε-decay", optimal_params['epsilon_decay'])
     
     # --- 3. Test with Increased Penalty ---
     print("\n--- Running with Penalty = -200 ---")
@@ -288,4 +367,9 @@ if __name__ == '__main__':
     penalty_params['penalty'] = -200.0
     penalty_agent, penalty_rewards, _ = train_agent(EPISODES, penalty_params)
     display_policy(penalty_agent)
+
+    # --- Turn off interactive mode ---
+    plt.ioff()
+    print("\nClose all plot windows to exit.")
+    plt.show() # Display all generated plots
 
