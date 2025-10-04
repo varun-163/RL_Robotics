@@ -205,3 +205,24 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# macOS specific files
+.DS_Store
+
+# ===================================================================
+# LaTeX Reports
+# Ignore all auxiliary files created during compilation
+# NOTE: We are NOT ignoring *.pdf by default, so your final compiled
+# report is saved in the repository. This is usually desired.
+# ===================================================================
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
