@@ -93,12 +93,12 @@ The rate at which the agent reduces exploration is crucial. Figure~\ref{fig:epsi
 \subsection{Convergence of Q-Values vs. Policy}
 The results strongly indicate that \textbf{the policy converges before the Q-values}. An agent's policy is determined by the \textit{relative} ranking of Q-values for actions in a given state ($\arg\max_a Q(s, a)$). This ranking can stabilize long before the Q-values themselves stop changing.
 
-Figure~\ref{fig:policy_heatmap} shows the clear, stable final policy. In contrast, Figure~\ref{fig:q_convergence} shows that the specific Q-value for taking 'Up' in the start state is still being refined late into training, even though the policy itself has likely been fixed for thousands of episodes.
+Figure~\ref{fig:policy_heatmap} shows the clear, stable final policy with the standard penalty. In contrast, Figure~\ref{fig:q_convergence} shows that the specific Q-value for taking 'Up' in the start state is still being refined late into training, even though the policy itself has likely been fixed for thousands of episodes.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.6\textwidth]{../results/qpolicy_visualizatoin_heatmapt.png}
-    \caption{The final learned policy and Q-value heatmap after 20,000 episodes. The arrows indicate a clear, optimal path to the +1 reward.}
+    \caption{The final learned policy with a penalty of -1. The arrows indicate a direct, optimal path to the +1 reward.}
     \label{fig:policy_heatmap}
 \end{figure}
 
@@ -110,9 +110,24 @@ Figure~\ref{fig:policy_heatmap} shows the clear, stable final policy. In contras
 \end{figure}
 
 \subsection{Effect of Increased Penalty}
-When the penalty at state (4,2) was increased from -1 to -200, the agent learned a much more conservative policy. It learns to take a longer route that gives the penalty state a wide berth, ensuring that even with the 10\% probability of deviation, it avoids the massive penalty. This demonstrates the algorithm's ability to adapt its policy to reflect the magnitude of risks and rewards in the environment.
+When the penalty at state (4,2) was increased from -1 to -200, the agent learned a much more conservative and risk-averse policy. A direct comparison between the two resulting policies reveals the agent's ability to factor in the magnitude of risk.
+
+\begin{itemize}
+    \item \textbf{Standard Policy (Penalty -1):} As seen in Figure~\ref{fig:policy_heatmap}, the agent learns the most direct path to the +1 reward. This path travels directly adjacent to the -1 penalty state. Given the stochastic nature of the environment, there is a 10\% chance of slipping into the penalty state from the cell below it (3,2). With a small penalty, this risk is acceptable for the sake of efficiency.
+    \item \textbf{Risk-Averse Policy (Penalty -200):} Figure~\ref{fig:policy_heatmap_penalty} shows a dramatically different strategy. The agent learns to take a longer, circuitous route, going up and around the wall. It completely avoids any state from which it could accidentally slip into the high-penalty zone. The Q-values for the states near the -200 penalty are significantly lower, propagating a "fear" of that region throughout the grid.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{../results/qvalue_heatmap_with_higher_punishment.png}
+    \caption{The final learned policy with a penalty of -200. The agent learns a longer, safer path to avoid any possibility of receiving the massive penalty.}
+    \label{fig:policy_heatmap_penalty}
+\end{figure}
+
+The significance of this comparison is that it demonstrates a core strength of Q-learning. The algorithm doesn't just learn a binary good/bad path; it learns a nuanced policy based on the \textit{expected value} of actions. A 10\% chance of a -200 reward is a massive deterrent, and the agent correctly learns that the longer, safer path has a higher overall expected reward than the shorter, riskier path. This ability to make trade-offs between efficiency and risk is crucial for applying reinforcement learning to real-world problems.
 
 \section{Conclusion}
-Q-learning successfully determined an optimal policy for the stochastic Gridworld. The analysis demonstrates the critical role of hyperparameter tuning in achieving efficient learning. We observed that an agent's policy converges substantially earlier than its underlying Q-values. The model's adaptation to a drastically increased penalty highlights its robustness and ability to learn risk-averse behavior.
+Q-learning successfully determined an optimal policy for the stochastic Gridworld. The analysis demonstrates the critical role of hyperparameter tuning in achieving efficient learning. We observed that an agent's policy converges substantially earlier than its underlying Q-values. Furthermore, the model's adaptation to a drastically increased penalty highlights its robustness and its ability to learn a risk-averse behavior that is appropriate to the environment's dangers.
 
 \end{document}
+
