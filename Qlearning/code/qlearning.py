@@ -273,7 +273,7 @@ def animate_navigation(agent, episode, total_episodes, fig, ax):
 
     # Correct the visual orientation to match array indexing (0,0 at top-left)
     ax.invert_yaxis()
-    ax.set_title(f"Episode {episode}/{total_episodes} | Press right arrow key to continue...", fontsize=14, pad=15)
+    ax.set_title(f"Episode {episode}/{total_episodes} | Press any key to continue...", fontsize=14, pad=15)
     
     # Pause execution and wait for a key press to continue
     plt.draw()
@@ -308,6 +308,41 @@ def display_policy(agent):
         print(' '.join([cell.rjust(5) for cell in policy_grid[i]]))
     print("-" * 29)
 
+def plot_q_value_heatmap(agent, title):
+    """Generates a heatmap of the maximum Q-values for each state."""
+    env = agent.env
+    max_q_values = np.max(agent.q_table, axis=2)
+    fig, ax = plt.subplots(figsize=(10, 7))
+    
+    cax = ax.imshow(max_q_values, cmap='RdYlGn', interpolation='nearest')
+    fig.colorbar(cax, label='Max Q-Value')
+    
+    ax.set_title(title, fontsize=16, pad=20)
+    ax.set_xticks(np.arange(env.width))
+    ax.set_yticks(np.arange(env.height))
+    ax.set_xticklabels(np.arange(1, env.width + 1))
+    ax.set_yticklabels(np.arange(1, env.height + 1))
+
+    action_arrows = {0: '↑', 1: '↓', 2: '←', 3: '→'}
+
+    for r in range(env.height):
+        for c in range(env.width):
+            pos = (r, c)
+            text_color = 'black'
+            if pos == env.obstacle_state:
+                ax.add_patch(plt.Rectangle((c - 0.5, r - 0.5), 1, 1, facecolor='black'))
+                ax.text(c, r, 'WALL', ha='center', va='center', color='white', weight='bold')
+            elif pos in env.terminal_states:
+                 reward = env.get_reward(pos)
+                 ax.text(c, r, f"[{int(reward)}]", ha='center', va='center', color=text_color, weight='bold', fontsize=12)
+            else:
+                q_val = max_q_values[r, c]
+                action = np.argmax(agent.q_table[r, c])
+                arrow = action_arrows[action]
+                ax.text(c, r, f"{arrow}\n{q_val:.2f}", ha='center', va='center', color=text_color, fontsize=10)
+
+    plt.show()
+
 
 if __name__ == '__main__':
     EPISODES = 20000
@@ -325,7 +360,7 @@ if __name__ == '__main__':
     plt.close(fig)
 
     # Plot Q-value convergence for the optimal run
-    plot_q_value_convergence(q_history, "Q-Value Convergence for Start State -> 'Up'")
+    plot_q_value_convergence(q_history, "Q-Value Convergence (Optimal) for Start State -> 'Up'")
 
     # --- Hyperparameter Tuning Experiments ---
     print("\n--- Testing different Learning Rates (alpha) ---")
@@ -365,8 +400,14 @@ if __name__ == '__main__':
     print("\n--- Running with Penalty = -200 ---")
     penalty_params = optimal_params.copy()
     penalty_params['penalty'] = -200.0
-    penalty_agent, penalty_rewards, _ = train_agent(EPISODES, penalty_params)
+    penalty_agent, penalty_rewards, penalty_q_history = train_agent(EPISODES, penalty_params)
     display_policy(penalty_agent)
+    
+    # Plot Q-value convergence for the -200 penalty run
+    plot_q_value_convergence(penalty_q_history, "Q-Value Convergence (Penalty = -200) for Start State -> 'Up'")
+
+    # Plot Q-value heatmap for the -200 penalty run
+    plot_q_value_heatmap(penalty_agent, "Q-Value Heatmap (Penalty = -200)")
 
     # --- Turn off interactive mode ---
     plt.ioff()
