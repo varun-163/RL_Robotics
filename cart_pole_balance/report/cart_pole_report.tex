@@ -14,6 +14,7 @@
 \usepackage{titlesec}
 \usepackage{url}
 \usepackage{abstract}
+\usepackage{hyperref}
 
 \titleformat{\section}{\large\bfseries\uppercase}{\thesection.}{1em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{1em}{}
@@ -32,7 +33,7 @@
 \maketitle
 
 \begin{abstract}
-In this assignment I apply Reinforcement Learning (RL) to the continuous-control Cart-Pole Swingup task from the DeepMind Control Suite. I implement an Actor--Critic agent using Proximal Policy Optimization (PPO) in Stable-Baselines3 and train it for 100\,000 environment steps on the \texttt{dm\_control/cartpole-swingup} environment. To study reproducibility, I train three policies with different random seeds (0, 1, 2) and evaluate each on a held-out evaluation seed (10). The agent reliably improves during training, but the final performance varies across seeds: one run underperforms while the others reach high returns. On average, the evaluation score is about 467 with large variability across seeds, showing both the effectiveness and sensitivity of PPO on this task.
+In this assignment I apply Reinforcement Learning (RL) to the continuous-control Cart-Pole Swingup task from the DeepMind Control Suite. I implement an Actor--Critic agent using Proximal Policy Optimization (PPO) in Stable-Baselines3 and train it for 100\,000 environment steps on the \texttt{dm\_control/cartpole-swingup} environment. To study reproducibility, I train three policies with different random seeds (0, 1, 2) and evaluate each on a held-out evaluation seed (10). The agent reliably improves during training, but the final performance varies across seeds: one run underperforms while the others reach high returns. On average, the evaluation score is about 467 with large variability across seeds, showing both the effectiveness and sensitivity of PPO on this task. The complete implementation is available at \url{https://github.com/varun-163/RL_Robotics/tree/assignments}.
 \end{abstract}
 
 \section{Introduction}
@@ -113,6 +114,11 @@ These numbers confirm that PPO can learn a strong controller for Cart-Pole Swing
 
 \section{Conclusion}
 In this assignment I applied PPO, an Actor--Critic algorithm, to the continuous Cart-Pole Swingup task using the DeepMind Control Suite. Training three seeds for 100\,000 steps each leads to good average performance, and the agent learns to swing up and balance the pole. At the same time, the gap between the best and worst seeds is large, so reporting both mean and variance across runs is important. In future work, I could explore longer training, hyperparameter tuning, or alternative algorithms such as SAC or TD3 to reduce this variability.
+
+The full code, training script, and plotting utilities used in this report are available at:\\[0.25em]
+\url{https://github.com/varun-163/RL_Robotics/tree/assignments}
+
+\clearpage   % start references on a new page
 
 \begin{thebibliography}{9}
 
